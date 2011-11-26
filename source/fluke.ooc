@@ -1,4 +1,54 @@
+import io/Writer
 
+BinaryWriter: class {
+
+    w: Writer
+
+    init: func(=w)
+
+    w8: func (val: UInt) {
+        w write(val as Char) 
+    }
+
+    wl16: func (val: UInt) {
+        w8(val)
+        w8(val >> 8)
+    }
+
+    wb16: func (val: UInt) {
+        w8(val >> 8)
+        w8(val)
+    }
+
+    wl24: func (val: UInt) {
+        wl16(val & 0xffff)
+        w8(val >> 16)
+    }
+
+    wb24: func (val: UInt) {
+        wb16(val >> 8)
+        w8(val)
+    }
+
+}
+
+AMF: class {
+
+    DATA_TYPE_NUMBER      := static 0x00
+    DATA_TYPE_BOOL        := static 0x01    
+    DATA_TYPE_STRING      := static 0x02
+    DATA_TYPE_OBJECT      := static 0x03
+    DATA_TYPE_NULL        := static 0x05
+    DATA_TYPE_UNDEFINED   := static 0x06
+    DATA_TYPE_REFERENCE   := static 0x07
+    DATA_TYPE_MIXEDARRAY  := static 0x08
+    DATA_TYPE_OBJECT_END  := static 0x09
+    DATA_TYPE_ARRAY       := static 0x0a
+    DATA_TYPE_DATE        := static 0x0b
+    DATA_TYPE_LONG_STRING := static 0x0c
+    DATA_TYPE_UNSUPPORTED := static 0x0d
+
+}
 
 FLV: class {
 
@@ -58,21 +108,8 @@ FLV: class {
     CODECID_REALH263 := static 8
     CODECID_MPEG4    := static 9
 
-    FRAME_KEY        := 1 << VIDEO_FRAMETYPE_OFFSET
-    FRAME_INTER      := 2 << VIDEO_FRAMETYPE_OFFSET
-    FRAME_DISP_INTER := 3 << VIDEO_FRAMETYPE_OFFSET
+    FRAME_KEY        := static 1 << VIDEO_FRAMETYPE_OFFSET
+    FRAME_INTER      := static 2 << VIDEO_FRAMETYPE_OFFSET
+    FRAME_DISP_INTER := static 3 << VIDEO_FRAMETYPE_OFFSET
 
-    AMF_DATA_TYPE_NUMBER      := 0x00
-    AMF_DATA_TYPE_BOOL        := 0x01    
-    AMF_DATA_TYPE_STRING      := 0x02
-    AMF_DATA_TYPE_OBJECT      := 0x03
-    AMF_DATA_TYPE_NULL        := 0x05
-    AMF_DATA_TYPE_UNDEFINED   := 0x06
-    AMF_DATA_TYPE_REFERENCE   := 0x07
-    AMF_DATA_TYPE_MIXEDARRAY  := 0x08
-    AMF_DATA_TYPE_OBJECT_END  := 0x09
-    AMF_DATA_TYPE_ARRAY       := 0x0a
-    AMF_DATA_TYPE_DATE        := 0x0b
-    AMF_DATA_TYPE_LONG_STRING := 0x0c
-    AMF_DATA_TYPE_UNSUPPORTED := 0x0d
 }
