@@ -113,3 +113,21 @@ FLV: class {
     FRAME_DISP_INTER := static 3 << VIDEO_FRAMETYPE_OFFSET
 
 }
+
+FLV: class {
+
+    audioFile: File
+    fileName: String
+    binWriter: BinaryWriter
+    fWriter: FileWriter
+    output := "test.flv"
+
+    init: func(=fileName) {
+        //read that audio file
+        f := File new(output)
+        fWriter = FileWriter new(f)
+        binWriter = BinaryWriter new(fWriter)
+    }
+
+    writeHeader: func { }
+}
