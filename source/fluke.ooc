@@ -1,34 +1,56 @@
 import io/[File, FileWriter, Writer]
 
+frexp: extern func(Double, Int*) -> Double
+fabs: extern func(Double) -> Double
+
+Utils: class {
+
+    double2Int: static func(val: Double) -> Int64 {
+        e: Int
+        if ( !val) {
+            return 0
+        } else if (val-val) { // overflow?
+            return (0x7FF0000000000000 as LLong) + (((val<0)<<63) as UInt64) + (val !=val);
+        }
+        val= frexp(val, e&);
+        return ((val<0) as UInt64 <<63 | (e+(1022 as LLong))<<52 | ((fabs(val)-0.5) as UInt64)*((1 as LLong)<<53));
+    }
+}
+
 BinaryWriter: class {
 
     w: Writer
-
+    offset := 0 // what's yet been written in bytes
     init: func(=w)
 
     
     w8: func (val: UInt) {
         w write(val as Char) 
+        offset += 1
     }
 
     wl16: func (val: UInt) {
         w8(val)
         w8(val >> 8)
+        offset += 2
     }
 
     wb16: func (val: UInt) {
         w8(val >> 8)
         w8(val)
+        offset += 2
     }
 
     wl24: func (val: UInt) {
         wl16(val & 0xffff)
         w8(val >> 16)
+        offset += 3
     }
 
     wb24: func (val: UInt) {
         wb16(val >> 8)
         w8(val)
+        offset += 3
     }
 
     
@@ -37,6 +59,7 @@ BinaryWriter: class {
         w8(val >> 8)
         w8(val >> 16)
         w8(val >> 24)
+        offset += 4
     }
 
     wb32: func (val: UInt) {
@@ -44,10 +67,22 @@ BinaryWriter: class {
         w8(val >> 16)
         w8(val >> 8)
         w8(val)
-
+        offset += 4
     }
+
+    wl64: func (val: UInt64) {
+        wl32((val & 0xffffffff) as UInt32)
+        wl32((val >> 32) as UInt32)
+    }
+
+    wb64: func(val: UInt64) {
+        wb32((val >> 32) as UInt32)
+        wb32((val & 0xffffffff) as UInt32)
+    }
+
     write: func (val: String) {
         w write(val)
+        offset += val length()
     }
 }
 
@@ -66,6 +101,16 @@ AMF: class {
     DATA_TYPE_DATE        := static 0x0b
     DATA_TYPE_LONG_STRING := static 0x0c
     DATA_TYPE_UNSUPPORTED := static 0x0d
+
+    putString: static func(writer: BinaryWriter, str: String) {
+        writer wb16(str length() as UInt)
+        writer write(str)
+    }
+
+    putDouble: static func(writer: BinaryWriter, val: Double) {
+        writer w8(DATA_TYPE_NUMBER)
+        writer wb64(Utils double2Int(val))
+    }
 
 }
 
@@ -99,8 +144,7 @@ FLV: class {
 
     MONO   := static 0
     STEREO := static 1
-
-    SAMPLESSIZE_8BIT  := static 0
+SAMPLESSIZE_8BIT  := static 0
     SAMPLESSIZE_16BIT := static 1 << AUDIO_SAMPLESSIZE_OFFSET
 
     SAMPLERATE_SPECIAL := static 0
@@ -149,9 +193,24 @@ FLV: class {
         binWriter w8(1) // version '1'
         binWriter w8(4) // flag that we only have audio
         
-        binWriter wb32(9)
-        binWriter wb32(0)
+        binWriter wb32(9) // header size
+        binWriter wb32(0) // not sure if neccessary
 
+        // TODO: check if we have to include the ==5 loop-part
+        binWriter w8(18) // META tag type
+        binWriter wb24(0) // size of data part
+        binWriter wb24(0) // time stamp
+        binWriter wb32(0) // reserved
+
+        binWriter w8(AMF DATA_TYPE_STRING)
+        AMF putString(binWriter, "onMetaData")
+        binWriter w8(AMF DATA_TYPE_MIXEDARRAY)
+        binWriter wb32(7) // size for audio + 2 (metadata_count) - seems somewhat small though
+
+        AMF putString(binWriter, "duration")
+        AMF putDouble(binWriter, 47.47) // dummy, needs to be filled with actual duration
+
+        
     }
 
 }
