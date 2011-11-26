@@ -1,3 +1,4 @@
 source/fluke
 .libs
 *_tmp
+.*.swp
