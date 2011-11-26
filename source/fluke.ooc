@@ -1,4 +1,4 @@
-import io/Writer
+import io/[File, FileWriter, Writer]
 
 BinaryWriter: class {
 
@@ -6,6 +6,7 @@ BinaryWriter: class {
 
     init: func(=w)
 
+    
     w8: func (val: UInt) {
         w write(val as Char) 
     }
@@ -30,6 +31,24 @@ BinaryWriter: class {
         w8(val)
     }
 
+    
+    wl32: func(val: UInt) {
+        w8(val)
+        w8(val >> 8)
+        w8(val >> 16)
+        w8(val >> 24)
+    }
+
+    wb32: func (val: UInt) {
+        w8(val >> 24)
+        w8(val >> 16)
+        w8(val >> 8)
+        w8(val)
+
+    }
+    write: func (val: String) {
+        w write(val)
+    }
 }
 
 AMF: class {
@@ -112,10 +131,7 @@ FLV: class {
     FRAME_INTER      := static 2 << VIDEO_FRAMETYPE_OFFSET
     FRAME_DISP_INTER := static 3 << VIDEO_FRAMETYPE_OFFSET
 
-}
-
-FLV: class {
-
+    // the non-static part
     audioFile: File
     fileName: String
     binWriter: BinaryWriter
@@ -124,10 +140,19 @@ FLV: class {
 
     init: func(=fileName) {
         //read that audio file
-        f := File new(output)
-        fWriter = FileWriter new(f)
+        fWriter := FileWriter new(output, "wb")
         binWriter = BinaryWriter new(fWriter)
     }
 
-    writeHeader: func { }
+    writeHeader: func { 
+        binWriter write("FLV") // each FLV file starts like that
+        binWriter w8(1) // version '1'
+        binWriter w8(4) // flag that we only have audio
+        
+        binWriter wb32(9)
+        binWriter wb32(0)
+
+    }
+
 }
+
