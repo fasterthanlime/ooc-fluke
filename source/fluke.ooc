@@ -83,9 +83,19 @@ BinaryWriter: class {
         w write(val)
     }
 
-    mark: func -> Long { w mark() }
+    skip: func (l: Long) {
+        seek(tell() + l)
+    }
 
-    seek: func (l: Long) { w seek(l) }
+    tell: func -> Long {
+        w mark()
+    }
+
+    seek: func (l: Long) {
+        // kids, don't do this at home: rely on an interface,
+        // not an implementation. Except on a deadline, of course.
+        w _makeRoom(l). seek(l)
+    }
 
     flush: func {
         target write(w buffer())
@@ -143,7 +153,7 @@ FLV: class {
     AMF_END_OF_OBJECT      := static 0x09
 
     HEADER_FLAG_HASAUDIO   := static 4
-    HEADER_FLAG_HASVIDEO   := static 4
+    HEADER_FLAG_HASVIDEO   := static 1
 
     TAG_TYPE_AUDIO   := static 0x08
     TAG_TYPE_VIDEO   := static 0x09
@@ -189,7 +199,7 @@ FLV: class {
     // the non-static part
     audioFile: File
     fileName: String
-    binWriter: BinaryWriter
+    avio: BinaryWriter
     fWriter: FileWriter
     output := "test.flv"
 
@@ -201,56 +211,80 @@ FLV: class {
     init: func(=fileName) {
         //read that audio file
         fWriter := FileWriter new(output, "wb")
-        binWriter = BinaryWriter new(fWriter)
+        avio = BinaryWriter new(fWriter)
     }
 
     writeHeader: func { 
-        binWriter write("FLV") // each FLV file starts like that
-        binWriter w8(1) // version '1'
-        binWriter w8(4) // flag that we only have audio
+        avio write("FLV") // each FLV file starts like that
+        avio w8(1) // All FLVs have version 1
+        avio w8(HEADER_FLAG_HASAUDIO) // flag that we only have audio
         
-        binWriter wb32(9) // header size
-        binWriter wb32(0) // not sure if neccessary
+        avio wb32(9) // header size
+        avio wb32(0) // not sure if neccessary
 
         // TODO: check if we have to include the ==5 loop-part
 
-        binWriter w8(0x12) // metadata tag type
-        datasizeMark := binWriter mark()
-        binWriter wb24(0) // size of data part, yet unknown, will have to write here later
-        binWriter wb24(0) // time stamp
-        binWriter wb32(0) // reserved
+        // write meta_tag
+        avio w8(0x12) // metadata tag type
+        metadataSizePos := avio tell()
+        avio wb24(0) // size of data part, yet unknown, will have to write here later
+        avio wb24(0) // time stamp
+        avio wb32(0) // reserved
 
-        binWriter w8(AMF DATA_TYPE_STRING)
-        AMF putString(binWriter, "onMetaData")
-        binWriter w8(AMF DATA_TYPE_MIXEDARRAY)
-        binWriter wb32(7) // size for audio + 2 (metadata_count) - seems somewhat small though
+        // now data of data_size size
 
-        AMF putString(binWriter, "duration")
-        AMF putDouble(binWriter, 47.47) // dummy, needs to be filled with actual duration
-        
-        AMF putString(binWriter, "audiodatarate");
-        AMF putDouble(binWriter, bit_rate / 1024.0);
+        // first event name as a string
+        avio w8(AMF DATA_TYPE_STRING)
+        AMF putString(avio, "onMetaData")
 
-        AMF putString(binWriter, "audiosamplerate");
-        AMF putDouble(binWriter, sample_rate);
+        // mixed array (hash) with size and string/type/data tuples
+        avio w8(AMF DATA_TYPE_MIXEDARRAY)
+        metadataCountPos := avio tell()
+        metadataCount := 5 + 2 // 5 for audio, 2 for duration and file size
+        avio wb32(metadataCount)
 
-        AMF putString(binWriter, "audiosamplesize");
-        AMF putDouble(binWriter, 16);
+        AMF putString(avio, "duration")
+        AMF putDouble(avio, 0.0) // dummy, needs to be filled with actual duration
+       
+        // audio specific tags
+        {
+            AMF putString(avio, "audiodatarate");
+            AMF putDouble(avio, bit_rate / 1024.0);
 
-        AMF putString(binWriter, "stereo");
-        AMF putBool(binWriter, channels == 2);
+            AMF putString(avio, "audiosamplerate");
+            AMF putDouble(avio, sample_rate);
 
-        AMF putString(binWriter, "audiocodecid");
-        AMF putDouble(binWriter, codec_tag);
-        endDatasizeMark := binWriter mark()
+            AMF putString(avio, "audiosamplesize");
+            AMF putDouble(avio, 16);
 
-        "Total size of metadata = %d" printfln(endDatasizeMark - datasizeMark)
-        binWriter seek(datasizeMark)
-        binWriter wb24(endDatasizeMark - datasizeMark - 10) // see ffmpeg source, what a f*'d up format...
+            AMF putString(avio, "stereo");
+            AMF putBool(avio, channels == 2);
 
-        binWriter seek(endDatasizeMark)
+            AMF putString(avio, "audiocodecid");
+            AMF putDouble(avio, codec_tag);
+        }
 
-        binWriter flush()
+        AMF putString(avio, "filesize")
+        AMF putDouble(avio, 0.0) // dummy
+
+        AMF putString(avio, "")
+        avio w8(AMF_END_OF_OBJECT)
+
+        // write total size of tag
+        dataSize := avio tell()
+        "dataSize = %d" printfln(dataSize)
+        "metadataCountPos = %d" printfln(metadataCountPos)
+        "metadataSizePos = %d" printfln(metadataSizePos)
+
+        avio seek(metadataCountPos)
+        avio wb32(metadataCount)
+
+        avio seek(metadataSizePos)
+        avio wb24(dataSize)
+        avio skip(dataSize + 10 - 3) // magic numbers from ffmpeg - yay!
+        avio wb32(dataSize + 11) // moar magic numbers from ffmpeg
+
+        avio flush()
     }
 
 }
