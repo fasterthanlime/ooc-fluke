@@ -7,6 +7,9 @@ import io/[File, FileWriter, Writer, BufferWriter]
 frexp: extern func(Double, Int*) -> Double
 fabs: extern func(Double) -> Double
 
+// av_dbl2int: extern func (d: Double) -> Int64
+av_dbl2int: extern func (d: Double, i: Int64*)
+
 Utils: class {
 
     double2Int: static func(val: Double) -> Int64 {
@@ -14,7 +17,7 @@ Utils: class {
         if ( !val) {
             return 0
         } else if (val-val) { // overflow?
-            return (0x7FF0000000000000 as LLong) + (((val<0)<<63) as UInt64) + (val !=val);
+            return (0x7FF0000000000000 as LLong) + (((val<0)<<63 as UInt64 )) + (val !=val);
         }
         val= frexp(val, e&);
         return ((val<0) as UInt64 <<63 | (e+(1022 as LLong))<<52 | ((fabs(val)-0.5) as UInt64)*((1 as LLong)<<53));
@@ -118,17 +121,24 @@ AMF: class {
     DATA_TYPE_LONG_STRING := static 0x0c
     DATA_TYPE_UNSUPPORTED := static 0x0d
 
-    putString: static func(writer: BinaryWriter, str: String) {
-        writer wb16(str length() as UInt)
-        writer write(str)
+    putString: static func(writer: BinaryWriter, val: String) {
+        "Writing string %s" printfln(val)
+        writer wb16(val length() as UInt)
+        writer write(val)
     }
 
     putDouble: static func(writer: BinaryWriter, val: Double) {
+        "Writing double %f" printfln(val)
         writer w8(DATA_TYPE_NUMBER)
-        writer wb64(Utils double2Int(val))
+        // zint := av_dbl2int(val)
+        zint: Int64
+        av_dbl2int(val, zint&)
+        writer wb64(zint)
+        fprintf(stdout, "It gives int %lld\n", zint)
     }
 
     putBool: static func(writer: BinaryWriter, val: Bool) {
+        "Writing bool %d" printfln(val)
         writer w8(DATA_TYPE_BOOL);
         writer w8(val ? 0 : 1);
     }
@@ -261,7 +271,8 @@ FLV: class {
             AMF putBool(avio, channels == 2);
 
             AMF putString(avio, "audiocodecid");
-            AMF putDouble(avio, codec_tag);
+            // AMF putDouble(avio, codec_tag);
+            AMF putDouble(avio, 2.0); // FIXME don't understand why but ffmpeg says 2
         }
 
         AMF putString(avio, "filesize")
@@ -274,6 +285,7 @@ FLV: class {
         dataSize := avio tell()
         "dataSize = %d" printfln(dataSize)
         "metadataCountPos = %d" printfln(metadataCountPos)
+        "metadataCount = %d" printfln(metadataCount)
         "metadataSizePos = %d" printfln(metadataSizePos)
 
         avio seek(metadataCountPos)
