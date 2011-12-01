@@ -146,7 +146,7 @@ FLV: class {
 
     MONO   := static 0
     STEREO := static 1
-SAMPLESSIZE_8BIT  := static 0
+    SAMPLESSIZE_8BIT  := static 0
     SAMPLESSIZE_16BIT := static 1 << AUDIO_SAMPLESSIZE_OFFSET
 
     SAMPLERATE_SPECIAL := static 0
@@ -199,6 +199,7 @@ SAMPLESSIZE_8BIT  := static 0
         binWriter wb32(0) // not sure if neccessary
 
         // TODO: check if we have to include the ==5 loop-part
+
         binWriter w8(18) // META tag type
         binWriter wb24(0) // size of data part
         binWriter wb24(0) // time stamp
