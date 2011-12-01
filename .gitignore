@@ -3,6 +3,6 @@ build
 .libs
 *_tmp
 .*.swp
-*.flv
 *.dump
 main
+test.flv
