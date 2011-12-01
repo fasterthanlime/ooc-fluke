@@ -1,6 +1,8 @@
 
 use math
-import io/[File, FileWriter, Writer]
+include math
+
+import io/[File, FileWriter, Writer, BufferWriter]
 
 frexp: extern func(Double, Int*) -> Double
 fabs: extern func(Double) -> Double
@@ -21,9 +23,12 @@ Utils: class {
 
 BinaryWriter: class {
 
-    w: Writer
+    target: Writer
+    w: BufferWriter
     offset := 0 // what's yet been written in bytes
-    init: func(=w)
+    init: func(=target) {
+        w = BufferWriter new()
+    }
 
     
     w8: func (val: UInt) {
@@ -86,6 +91,14 @@ BinaryWriter: class {
         w write(val)
         offset += val length()
     }
+
+    mark: func -> Long { w mark() }
+
+    seek: func (l: Long) { w seek(l) }
+
+    flush: func {
+        target write(w buffer())
+    }
 }
 
 AMF: class {
@@ -112,6 +125,11 @@ AMF: class {
     putDouble: static func(writer: BinaryWriter, val: Double) {
         writer w8(DATA_TYPE_NUMBER)
         writer wb64(Utils double2Int(val))
+    }
+
+    putBool: static func(writer: BinaryWriter, val: Bool) {
+        writer w8(DATA_TYPE_BOOL);
+        writer w8(val ? 0 : 1);
     }
 
 }
@@ -184,6 +202,11 @@ FLV: class {
     fWriter: FileWriter
     output := "test.flv"
 
+    channels := 2
+    codec_tag := CODECID_MP3
+    bit_rate := 320000
+    sample_rate := 44100
+
     init: func(=fileName) {
         //read that audio file
         fWriter := FileWriter new(output, "wb")
@@ -200,8 +223,9 @@ FLV: class {
 
         // TODO: check if we have to include the ==5 loop-part
 
-        binWriter w8(18) // META tag type
-        binWriter wb24(0) // size of data part
+        binWriter w8(0x12) // metadata tag type
+        datasizeMark := binWriter mark()
+        binWriter wb24(0) // size of data part, yet unknown, will have to write here later
         binWriter wb24(0) // time stamp
         binWriter wb32(0) // reserved
 
@@ -212,8 +236,30 @@ FLV: class {
 
         AMF putString(binWriter, "duration")
         AMF putDouble(binWriter, 47.47) // dummy, needs to be filled with actual duration
-
         
+        AMF putString(binWriter, "audiodatarate");
+        AMF putDouble(binWriter, bit_rate / 1024.0);
+
+        AMF putString(binWriter, "audiosamplerate");
+        AMF putDouble(binWriter, sample_rate);
+
+        AMF putString(binWriter, "audiosamplesize");
+        AMF putDouble(binWriter, 16);
+
+        AMF putString(binWriter, "stereo");
+        AMF putBool(binWriter, channels == 2);
+
+        AMF putString(binWriter, "audiocodecid");
+        AMF putDouble(binWriter, codec_tag);
+        endDatasizeMark := binWriter mark()
+
+        "Total size of metadata = %d" printfln(endDatasizeMark - datasizeMark)
+        binWriter seek(datasizeMark)
+        binWriter wb24(endDatasizeMark - datasizeMark - 10) // see ffmpeg source, what a f*'d up format...
+
+        binWriter seek(endDatasizeMark)
+
+        binWriter flush()
     }
 
 }
