@@ -25,7 +25,6 @@ BinaryWriter: class {
 
     target: Writer
     w: BufferWriter
-    offset := 0 // what's yet been written in bytes
     init: func(=target) {
         w = BufferWriter new()
     }
@@ -33,31 +32,26 @@ BinaryWriter: class {
     
     w8: func (val: UInt) {
         w write(val as Char) 
-        offset += 1
     }
 
     wl16: func (val: UInt) {
         w8(val)
         w8(val >> 8)
-        offset += 2
     }
 
     wb16: func (val: UInt) {
         w8(val >> 8)
         w8(val)
-        offset += 2
     }
 
     wl24: func (val: UInt) {
         wl16(val & 0xffff)
         w8(val >> 16)
-        offset += 3
     }
 
     wb24: func (val: UInt) {
         wb16(val >> 8)
         w8(val)
-        offset += 3
     }
 
     
@@ -66,7 +60,6 @@ BinaryWriter: class {
         w8(val >> 8)
         w8(val >> 16)
         w8(val >> 24)
-        offset += 4
     }
 
     wb32: func (val: UInt) {
@@ -74,7 +67,6 @@ BinaryWriter: class {
         w8(val >> 16)
         w8(val >> 8)
         w8(val)
-        offset += 4
     }
 
     wl64: func (val: UInt64) {
@@ -89,7 +81,6 @@ BinaryWriter: class {
 
     write: func (val: String) {
         w write(val)
-        offset += val length()
     }
 
     mark: func -> Long { w mark() }
