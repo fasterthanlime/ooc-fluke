@@ -1,3 +1,5 @@
+
+use math
 import io/[File, FileWriter, Writer]
 
 frexp: extern func(Double, Int*) -> Double
