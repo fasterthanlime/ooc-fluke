@@ -105,6 +105,18 @@ BinaryWriter: class {
     }
 }
 
+AVMEDIA: enum {
+
+    TYPE_UNKNOWN = -1
+    TYPE_VIDEO = 0
+    TYPE_AUDIO
+    TYPE_DATA
+    TYPE_SUBTITLE
+    TYPE_ATTACHMENT
+    TYPE_NB
+}
+
+
 AMF: class {
 
     DATA_TYPE_NUMBER      := static 0x00
@@ -143,6 +155,25 @@ AMF: class {
         writer w8(val ? 0 : 1);
     }
 
+}
+
+Packet: class {
+
+    pts: Int64
+    dts: Int64
+    data: UInt8* data
+    size: Int
+    streamIndex: Int
+    flags: Int
+    duration: Int
+    
+    //void(*  destruct )(struct AVPacket *)
+    priv: Pointer
+    pos: Int64
+
+    convergenceDuration: Int64
+
+    init: func {}
 }
 
 FLV: class {
@@ -299,5 +330,30 @@ FLV: class {
         avio flush()
     }
 
+    writePacket(packet: Packet): func {
+        // ts = pkt->dts + flv->delay
+        ts: UInt = 1 // dummy
+
+        flagsSize = 1
+        // flags = get_audio_flags(enc);
+        flags = 0
+        // type is AVMEDIA_TYPE_AUDIO
+        avio w8(FLV TAG_TYPE_AUDIO)
+
+        // TODO: check ts stuff - are we concerned at all?
+
+        avio wb24(1000) // packet size, dummy val
+        avio wb24(ts)
+        avio w8((ts >>24) & 0x7F) // time stamps are 32bits signed
+        avio wb24(10) // flv reserved
+
+        ts = packet dts // + flv delay
+        avio w8(flags)
+        
+        avio write(data, size)
+        avio wb32(size + flagsSize + 11) // prev tag size
+        
+        //flv->duration = FFMAX(flv->duration, pkt->pts + flv->delay + pkt->duration);
+        avio flush()
 }
 
