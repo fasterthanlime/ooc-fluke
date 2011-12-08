@@ -86,6 +86,12 @@ BinaryWriter: class {
         w write(val)
     }
 
+    write: func ~withSize(val: String, size: Int) {
+       for (i in 0..size) {
+           w8(val[i] as UInt)
+       }
+    }
+
     skip: func (l: Long) {
         seek(tell() + l)
     }
@@ -161,7 +167,7 @@ Packet: class {
 
     pts: Int64
     dts: Int64
-    data: UInt8* data
+    data: UInt8*
     size: Int
     streamIndex: Int
     flags: Int
@@ -177,6 +183,18 @@ Packet: class {
 }
 
 FLV: class {
+
+    delay: Int64
+    duration: Int64
+    durationOffset: Int64
+    filesizeOffset: Int64
+    reserved: Int
+    wrongDTS: Int
+
+    init : func {}
+}
+
+Encoder: class {
 
     AUDIO_SAMPLESSIZE_OFFSET  := static 1
     AUDIO_SAMPLERATE_OFFSET  := static 2
@@ -244,6 +262,8 @@ FLV: class {
     fWriter: FileWriter
     output := "test.flv"
 
+    flv: FLV
+
     channels := 2
     codec_tag := CODECID_MP3
     bit_rate := 320000
@@ -253,6 +273,7 @@ FLV: class {
         //read that audio file
         fWriter := FileWriter new(output, "wb")
         avio = BinaryWriter new(fWriter)
+        flv = FLV new()
     }
 
     writeHeader: func { 
@@ -330,30 +351,31 @@ FLV: class {
         avio flush()
     }
 
-    writePacket(packet: Packet): func {
-        // ts = pkt->dts + flv->delay
-        ts: UInt = 1 // dummy
+    writePacket: func (packet: Packet){
+        
+        size := packet size
 
-        flagsSize = 1
+        flagsSize := 1
         // flags = get_audio_flags(enc);
-        flags = 0
+        flags := 0
         // type is AVMEDIA_TYPE_AUDIO
-        avio w8(FLV TAG_TYPE_AUDIO)
+        avio w8(This TAG_TYPE_AUDIO)
 
         // TODO: check ts stuff - are we concerned at all?
+        ts := packet dts + flv delay
 
-        avio wb24(1000) // packet size, dummy val
+        avio wb24(size + flagsSize) // packet size, dummy val
         avio wb24(ts)
         avio w8((ts >>24) & 0x7F) // time stamps are 32bits signed
-        avio wb24(10) // flv reserved
+        avio wb24(flv reserved) // flv reserved
 
-        ts = packet dts // + flv delay
         avio w8(flags)
         
-        avio write(data, size)
+        avio write(packet data as String, size)
         avio wb32(size + flagsSize + 11) // prev tag size
         
         //flv->duration = FFMAX(flv->duration, pkt->pts + flv->delay + pkt->duration);
         avio flush()
+    }
 }
 
